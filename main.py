@@ -80,6 +80,6 @@ async def whatsapp_webhook(request: Request):
         print(f"OpenAI API error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: OpenAI API error")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
