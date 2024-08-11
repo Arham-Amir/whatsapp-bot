@@ -1,20 +1,23 @@
-from fastapi import FastAPI, Form, Request, HTTPException, Query
-from fastapi.responses import RedirectResponse, HTMLResponse
-from firebase_config import db
-from openai import OpenAI
-import os
-from twilio.rest import Client
-from dotenv import load_dotenv
-from fastapi.templating import Jinja2Templates
-from datetime import datetime
 from typing import Optional
+import bcrypt
+from fastapi import FastAPI, Form, Request, HTTPException, Depends, status
+from fastapi.responses import RedirectResponse, HTMLResponse
+from firebase_config import db  # Firebase Firestore configuration
+from openai import OpenAI
+from fastapi.templating import Jinja2Templates
+from passlib.context import CryptContext
+from twilio.rest import Client
+import os
+import uuid
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
 import logging
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables from a .env file if present
+# Load environment variables from a .env file
 load_dotenv()
 
 app = FastAPI()
@@ -24,6 +27,88 @@ openapi_client = OpenAI()
 # Initialize Twilio client with environment variables
 twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
 twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
+
+
+# Password hashing context
+
+APP_USERNAME = os.getenv("APP_USERNAME")
+APP_PASSWORD_HASH = os.getenv("APP_PASSWORD_HASH")
+
+
+async def get_current_user(request: Request):
+    session_id = request.cookies.get("session_id")
+    
+    if not session_id:
+        return None  # User is not authenticated
+
+    # Check if the session exists in Firestore
+    session_ref = db.collection("user_sessions").document(session_id)
+    session_doc = session_ref.get()
+    
+    if not session_doc.exists or not session_doc.to_dict().get("authenticated"):
+        return None  # Session is not valid or not authenticated
+
+    return session_doc.to_dict().get("username")
+
+async def require_authentication(request: Request):
+    user = await get_current_user(request)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_302_FOUND,
+            detail="Not authenticated",
+            headers={"Location": "/signin"}
+        )
+    return user
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password.decode('utf-8')
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def get_session_from_db(session_id):
+    """Retrieve session data from Firebase."""
+    try:
+        doc_ref = db.collection("user_sessions").document(session_id)
+        doc = doc_ref.get()
+        return doc.to_dict() if doc.exists else None
+    except Exception as e:
+        logger.error(f"Error retrieving session from Firebase: {e}")
+        return None
+
+def save_session_to_db(session_id, session_data):
+    """Save session data to Firebase."""
+    try:
+        db.collection("user_sessions").document(session_id).set(session_data)
+    except Exception as e:
+        logger.error(f"Error saving session to Firebase: {e}")
+
+def delete_session_from_db(session_id):
+    """Delete session data from Firebase."""
+    try:
+        db.collection("user_sessions").document(session_id).delete()
+    except Exception as e:
+        logger.error(f"Error deleting session from Firebase: {e}")
+
+def authenticate_user(username: str, password: str):
+    """Check if the provided username and password are correct."""
+    if username == APP_USERNAME and verify_password(password, APP_PASSWORD_HASH):
+        return True
+    return False
+
+def create_session(username: str):
+    """Create a new session and store it in Firebase."""
+    session_id = str(uuid.uuid4())
+    session_data = {
+        "username": username,
+        "created_at": datetime.now().isoformat(),
+        "expires_at": (datetime.now() + timedelta(hours=1)).isoformat(),  # Set session expiry
+        "authenticated": True
+    }
+    save_session_to_db(session_id, session_data)
+    return session_id
 
 def get_system_prompt() -> str:
     """Retrieve the system prompt from Firestore."""
@@ -43,7 +128,7 @@ def get_chat_history(phone_number: str) -> list:
     except Exception as e:
         logger.error(f"Error retrieving chat history: {e}")
         return []
-    
+
 def save_chat_history(phone_number: str, chat_history: list):
     """Save updated chat history for a specific phone number."""
     try:
@@ -96,8 +181,39 @@ def group_messages(history: list, phone_number: str) -> list:
     return grouped
 
 
+@app.get("/signin", response_class=HTMLResponse)
+async def get_signin(request: Request, user: str = Depends(get_current_user)):
+    # If the user is authenticated, redirect to the home page
+    if user:
+        return RedirectResponse("/", status_code=303)
+    # Otherwise, return the sign-in page
+    return templates.TemplateResponse("signin.html", {"request": request})
+
+@app.post("/signin")
+async def post_signin(request: Request, username: str = Form(...), password: str = Form(...)):
+    if authenticate_user(username, password):
+        session_id = create_session(username)
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=3600)
+        return response
+    else:
+        return templates.TemplateResponse("signin.html", {
+            "request": request,
+            "error": "Invalid username or password"
+        })
+
+
+@app.get("/signout")
+async def signout(request: Request):
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        delete_session_from_db(session_id)
+    response = RedirectResponse("/signin", status_code=303)
+    response.delete_cookie("session_id")
+    return response
+
 @app.get("/", response_class=HTMLResponse)
-async def get_edit_prompt(request: Request, message: str = None):
+async def get_edit_prompt(request: Request, message: str = None, user: str = Depends(require_authentication)):
     """Retrieve and display the current system prompt."""
     try:
         current_prompt = get_system_prompt()
@@ -117,7 +233,7 @@ async def get_edit_prompt(request: Request, message: str = None):
         })
 
 @app.post("/")
-async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
+async def post_edit_prompt(request: Request, system_prompt: str = Form(...), user: str = Depends(require_authentication)):
     """Update and save the system prompt."""
     try:
         doc_ref = db.collection("settings").document("system_prompt")
@@ -135,7 +251,7 @@ async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
 
 
 @app.get("/view-logs", response_class=HTMLResponse)
-async def get_view_logs(request: Request, phone_number: Optional[str] = None, page: int = 1, per_page: int = 10):
+async def get_view_logs(request: Request, phone_number: Optional[str] = None, page: int = 1, per_page: int = 10, user: str = Depends(require_authentication)):
     try:
         all_users = []
 
