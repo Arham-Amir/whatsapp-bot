@@ -1,11 +1,10 @@
 from fastapi import FastAPI, Form, Request, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from firebase_config import db
 from openai import OpenAI
 import os
 from twilio.rest import Client
 from dotenv import load_dotenv
-from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 # Load environment variables from a .env file if present
@@ -15,75 +14,60 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 openapi_client = OpenAI()
 
-
 # Initialize Twilio client with environment variables
 twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
 twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
 
-@app.get("/", response_class=HTMLResponse)
-async def get_edit_prompt(request: Request):
+def get_system_prompt() -> str:
+    """Retrieve the system prompt from Firestore."""
     try:
-        # Retrieve the system prompt from Firestore
         doc_ref = db.collection("settings").document("system_prompt")
         doc = doc_ref.get()
-
-        # Check if the document exists and has valid data
-        if doc.exists and doc.to_dict() is not None:
-            current_prompt = doc.to_dict().get("prompt", "Default system prompt")
-        else:
-            current_prompt = "Default system prompt"
-
+        return doc.to_dict().get("prompt", "Default system prompt") if doc.exists else "Default system prompt"
     except Exception as e:
         print(f"Error retrieving system prompt: {e}")
-        current_prompt = "Default system prompt"
-
-    return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": current_prompt})
+        return "Default system prompt"
 
 
-@app.post("/")
-async def post_edit_prompt(system_prompt: str = Form(...)):
+def get_chat_history(phone_number: str) -> list:
+    """Retrieve chat history for a specific phone number."""
     try:
-        # Store the updated system prompt in Firestore
-        doc_ref = db.collection("settings").document("system_prompt")
-        doc_ref.set({"prompt": system_prompt})
-
-        # Redirect to the home page with a success message
-        return RedirectResponse(url="/?message=System%20prompt%20updated%20successfully!", status_code=302)
-
+        doc_ref = db.collection("conversations").document(phone_number)
+        doc = doc_ref.get()
+        return doc.to_dict().get("history", []) if doc.exists else []
     except Exception as e:
-        print(f"Error saving system prompt: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error: Failed to save system prompt")
+        print(f"Error retrieving chat history: {e}")
+        return []
 
 
-
-@app.get("/view-logs", response_class=HTMLResponse)
-async def get_view_logs(request: Request, phone_number: str = None):
+def save_chat_history(phone_number: str, chat_history: list):
+    """Save updated chat history for a specific phone number."""
     try:
-        logs = []
-        if phone_number:
-            # Retrieve logs for a specific phone number from Firestore
-            doc_ref = db.collection("conversations").document(phone_number)
-            doc = doc_ref.get()
-            if doc.exists:
-                logs.append({"phone_number": phone_number, **doc.to_dict()})
-        else:
-            # Retrieve all logs
-            docs = db.collection("conversations").stream()
-            for doc in docs:
-                logs.append({"phone_number": doc.id, **doc.to_dict()})
-                
-        print(f"Logs retrieved: {logs}")
-        return templates.TemplateResponse("view_logs.html", {"request": request, "logs": logs, "phone_number": phone_number})
-
+        doc_ref = db.collection("conversations").document(phone_number)
+        doc_ref.set({"history": chat_history})
     except Exception as e:
-        print(f"Error retrieving logs: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error: Failed to retrieve logs")
+        print(f"Error saving chat history: {e}")
 
 
-def send_message(to_number, body_text):
+def generate_openai_response(messages: list) -> str:
+    """Generate a response from OpenAI GPT-4o."""
     try:
-        # Send the message using Twilio's API
+        response = openapi_client.chat.completions.create(
+            model="gpt-4o-2024-08-06",
+            messages=messages,
+            max_tokens=200,
+            temperature=0.7
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"OpenAI API error: {e}")
+        return "Sorry, I couldn't process your request."
+
+
+def send_message(to_number: str, body_text: str):
+    """Send a message using Twilio's API."""
+    try:
         message = twilio_client.messages.create(
             from_=f"whatsapp:{twilio_phone_number}",
             body=body_text,
@@ -94,51 +78,79 @@ def send_message(to_number, body_text):
         print(f"Error sending message to {to_number}: {e}")
 
 
+@app.get("/", response_class=HTMLResponse)
+async def get_edit_prompt(request: Request):
+    """Retrieve and display the current system prompt."""
+    try:
+        current_prompt = get_system_prompt()
+    except Exception as e:
+        print(f"Error retrieving system prompt: {e}")
+        current_prompt = "Default system prompt"
+
+    return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": current_prompt})
+
+
+@app.post("/")
+async def post_edit_prompt(system_prompt: str = Form(...)):
+    """Update and save the system prompt."""
+    try:
+        doc_ref = db.collection("settings").document("system_prompt")
+        doc_ref.set({"prompt": system_prompt})
+        return RedirectResponse(url="/?message=System%20prompt%20updated%20successfully!", status_code=302)
+    except Exception as e:
+        print(f"Error saving system prompt: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error: Failed to save system prompt")
+
+
+@app.get("/view-logs", response_class=HTMLResponse)
+async def get_view_logs(request: Request, phone_number: str = None):
+    """Retrieve and display logs for a specific phone number or all logs."""
+    try:
+        logs = []
+        if phone_number:
+            doc_ref = db.collection("conversations").document(phone_number)
+            doc = doc_ref.get()
+            if doc.exists:
+                logs.append({"phone_number": phone_number, **doc.to_dict()})
+        else:
+            docs = db.collection("conversations").stream()
+            for doc in docs:
+                logs.append({"phone_number": doc.id, **doc.to_dict()})
+
+        print(f"Logs retrieved: {logs}")
+        return templates.TemplateResponse("view_logs.html", {"request": request, "logs": logs, "phone_number": phone_number})
+    except Exception as e:
+        print(f"Error retrieving logs: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error: Failed to retrieve logs")
+
+
 @app.post("/webhook")
 async def whatsapp_webhook(request: Request):
+    """Handle incoming WhatsApp messages and generate responses."""
     try:
         form_data = await request.form()
         message_body = form_data.get('Body')
         whatsapp_number = form_data.get('From').split("whatsapp:")[-1]
 
-        # Retrieve the existing chat history for this phone number
-        doc_ref = db.collection("conversations").document(whatsapp_number)
-        doc = doc_ref.get()
-        chat_history = doc.to_dict().get("history", []) if doc.exists and doc.to_dict() is not None else []
-
-        # Add the incoming message to the chat history
+        chat_history = get_chat_history(whatsapp_number)
         chat_history.append({"role": "user", "content": message_body})
 
-        # Retrieve the system prompt from Firestore
-        prompt_doc_ref = db.collection("settings").document("system_prompt")
-        prompt_doc = prompt_doc_ref.get()
-        system_prompt = prompt_doc.to_dict().get("prompt", "") if prompt_doc.exists and prompt_doc.to_dict() is not None else ""
-
-        # Create the prompt with system instructions and chat history
+        system_prompt = get_system_prompt()
         messages = [{"role": "system", "content": system_prompt}] + chat_history
 
-        # Call OpenAI GPT-4o-2024-08-06 chat model to generate a response
-        response = openapi_client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
-            messages=messages,
-            max_tokens=200,
-            temperature=0.7
-        )
+        reply_text = generate_openai_response(messages)
 
-        reply_text = response.choices[0].message.content.strip()
-
-        # Store the updated chat history back in Firestore
-        doc_ref.set({"history": chat_history})
-
-        # Send the generated response to the user
+        save_chat_history(whatsapp_number, chat_history)
         send_message(whatsapp_number, reply_text)
+
         return ""
 
     except Exception as e:
-        print(f"OpenAI API error: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error: OpenAI API error")
+        print(f"Error in webhook processing: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error: Webhook processing error")
 
 
+# Uncomment if running locally
 # if __name__ == "__main__":
 #     import uvicorn
 #     uvicorn.run(app, host="0.0.0.0", port=8000)
