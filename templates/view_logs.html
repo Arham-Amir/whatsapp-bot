@@ -6,28 +6,54 @@
 <h1 class="text-3xl mb-5">View Logs</h1>
 <form action="/view-logs" method="get">
     <label for="phone_number" class="block mb-2">Search by Phone Number:</label>
-    <input type="text" id="phone_number" name="phone_number" value="{{ phone_number }}" placeholder="Enter phone number"
-        class="bg-gray-200 rounded-lg p-2 mb-4">
+    <input type="text" id="phone_number" name="phone_number" value="{{ phone_number if phone_number else '' }}"
+        placeholder="Enter phone number" class="bg-gray-200 rounded-lg p-2 mb-4">
     <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-800">Search</button>
 </form>
 
-<ul class="masonry mt-4">
-    {% for log in logs %}
-    <li class="masonry-item p-4 border rounded-lg flex flex-col gap-5 shadow-md px-10">
-        <p><strong class="block">Phone Number:</strong> {{ log.phone_number }}</p>
-        <strong class="min-w-fit mx-auto">History:</strong>
-        {% for entry in log.history %}
-        <div class="flex flex-col gap-2">
-            <p><strong>Role:</strong> {{ entry.role }}</p>
-            <p><strong>Content:</strong> {{ entry.content }}</p>
-            <p><strong>Timestamp:</strong> {{ entry.timestamp if entry.timestamp else "No timestamp available" }}</p>
+<ul class="mt-4">
+    {% if messages %}
+    {% for group in messages %}
+    <li class="mb-4 p-4 border rounded-lg shadow-md">
+        <div class="flex flex-col gap-4">
+            {% for entry in group %}
+            <div class="p-2 bg-gray-100 rounded-lg flex gap-3 items-start">
+                {% if entry.role.startswith('+') %}
+                <p>
+                    <a href="/view-logs?phone_number={{ entry.role|urlencode }}&page=1&per_page={{ per_page }}"
+                       class="text-blue-500 hover:text-blue-700">
+                       {{ entry.role }}
+                    </a>
+                </p>
+                {% else %}
+                <p class="font-semibold">{{ entry.role|capitalize }}:</p>
+                {% endif %}
+                <p>{{ entry.content }}</p>
+            </div>
+            {% endfor %}
+            {% if group[0].timestamp %}
+            <p class="text-gray-500 text-sm mt-2">Timestamp: {{ group[0].formatted_timestamp }}</p>
+            {% else %}
+            <p class="text-gray-500 text-sm mt-2">Timestamp not available</p>
+            {% endif %}
         </div>
-        {% endfor %}
     </li>
+    {% endfor %}
     {% else %}
     <li>No logs found.</li>
-    {% endfor %}
+    {% endif %}
 </ul>
+
+<div class="mt-4">
+    <nav class="flex gap-3 justify-between">
+        <a href="?page={{ page - 1 if has_prev_page else '#' }}&per_page={{ per_page }}"
+            class="text-blue-500 hover:text-blue-700 {% if not has_prev_page %}text-gray-400 cursor-not-allowed pointer-events-none{% endif %}">&laquo; Previous</a>
+        <span>Page {{ page }}</span>
+        <a href="?page={{ page + 1 if has_next_page else '#' }}&per_page={{ per_page }}" 
+            class="text-blue-500 hover:text-blue-700 {% if not has_next_page %}text-gray-400 cursor-not-allowed pointer-events-none{% endif %}">Next &raquo;</a>
+    </nav>
+</div>
+
 {% endblock %}
 
 {% set active_page = 'logs' %}

@@ -1,5 +1,4 @@
-import logging
-from fastapi import FastAPI, Form, Request, HTTPException
+from fastapi import FastAPI, Form, Request, HTTPException, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
 from firebase_config import db
 from openai import OpenAI
@@ -8,6 +7,9 @@ from twilio.rest import Client
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
+from typing import Optional
+import logging
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +26,6 @@ openapi_client = OpenAI()
 twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
 twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
-
 def get_system_prompt() -> str:
     """Retrieve the system prompt from Firestore."""
     try:
@@ -35,9 +36,7 @@ def get_system_prompt() -> str:
         logger.error(f"Error retrieving system prompt: {e}")
         return "Default system prompt"
 
-
 def get_chat_history(phone_number: str) -> list:
-    """Retrieve chat history for a specific phone number."""
     try:
         doc_ref = db.collection("conversations").document(phone_number)
         doc = doc_ref.get()
@@ -45,8 +44,7 @@ def get_chat_history(phone_number: str) -> list:
     except Exception as e:
         logger.error(f"Error retrieving chat history: {e}")
         return []
-
-
+    
 def save_chat_history(phone_number: str, chat_history: list):
     """Save updated chat history for a specific phone number."""
     try:
@@ -54,7 +52,6 @@ def save_chat_history(phone_number: str, chat_history: list):
         doc_ref.set({"history": chat_history})
     except Exception as e:
         logger.error(f"Error saving chat history: {e}")
-
 
 def generate_openai_response(messages: list) -> str:
     """Generate a response from OpenAI GPT-4o."""
@@ -70,7 +67,6 @@ def generate_openai_response(messages: list) -> str:
         logger.error(f"OpenAI API error: {e}")
         return "Sorry, I couldn't process your request."
 
-
 def send_message(to_number: str, body_text: str):
     """Send a message using Twilio's API."""
     try:
@@ -83,7 +79,24 @@ def send_message(to_number: str, body_text: str):
     except Exception as e:
         logger.error(f"Error sending message to {to_number}: {e}")
 
+def group_messages(history: list, phone_number: str = None) -> list:
+    grouped = []
+    temp_pair = []
+    for entry in history:
+        if entry['role'] == 'user':
+            if temp_pair:
+                grouped.append(temp_pair)
+            temp_pair = [{'role': phone_number, 'content': entry['content'], 'timestamp': entry.get('timestamp')}]
+        elif entry['role'] == 'assistant':
+            if temp_pair:
+                temp_pair.append(entry)
+                grouped.append(temp_pair)
+                temp_pair = []
+    if temp_pair:
+        grouped.append(temp_pair)
+    return grouped
 @app.get("/", response_class=HTMLResponse)
+
 async def get_edit_prompt(request: Request, message: str = None):
     """Retrieve and display the current system prompt."""
     try:
@@ -103,7 +116,6 @@ async def get_edit_prompt(request: Request, message: str = None):
             "message": message
         })
 
-
 @app.post("/")
 async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
     """Update and save the system prompt."""
@@ -121,40 +133,56 @@ async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
         logger.error(f"Error saving system prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to save system prompt")
 
-
 @app.get("/view-logs", response_class=HTMLResponse)
-async def get_view_logs(request: Request, phone_number: str = None):
-    """Retrieve and display logs for a specific phone number or all logs, ordered by date."""
+async def get_view_logs(request: Request, phone_number: Optional[str] = None, page: int = 1, per_page: int = 10):
     try:
-        logs = []
+        grouped_messages = []
+        has_prev_page = False
+        has_next_page = False
+
         if phone_number:
-            doc_ref = db.collection("conversations").document(phone_number)
-            doc = doc_ref.get()
-            if doc.exists:
-                logs.append({"phone_number": phone_number, **doc.to_dict()})
+            history = get_chat_history(phone_number)
+            grouped_messages = group_messages(history, phone_number)
         else:
             docs = db.collection("conversations").stream()
+            all_messages = []
             for doc in docs:
-                logs.append({"phone_number": doc.id, **doc.to_dict()})
+                phone_number = doc.id
+                history = doc.to_dict().get("history", [])
+                all_messages.extend(group_messages(history, phone_number))
 
-        # Sort each log's history by timestamp in descending order
-        for log in logs:
-            log['history'] = sorted(log['history'], key=lambda x: x['timestamp'], reverse=True)
+            total_messages = len(all_messages)
+            start_index = (page - 1) * per_page
+            end_index = start_index + per_page
+            grouped_messages = all_messages[start_index:end_index]
 
-        # Sort logs themselves by the most recent entry in the history
-        logs.sort(key=lambda x: x['history'][0]['timestamp'] if x['history'] else 0, reverse=True)
+            has_prev_page = page > 1
+            has_next_page = end_index < total_messages
 
-        logger.info("Logs retrieved and sorted by date.")
+        for group in grouped_messages:
+            for entry in group:
+                if 'timestamp' in entry:
+                    try:
+                        timestamp = datetime.fromisoformat(entry['timestamp'])
+                        entry['formatted_timestamp'] = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                    except ValueError:
+                        entry['formatted_timestamp'] = 'Invalid timestamp'
+
+        grouped_messages.sort(key=lambda x: x[0].get('timestamp', ''), reverse=True)
+
         return templates.TemplateResponse("view_logs.html", {
             "request": request,
-            "logs": logs,
-            "phone_number": phone_number,
+            "messages": grouped_messages,
+            "phone_number": phone_number if phone_number else None,
+            "page": page,
+            "per_page": per_page,
+            "has_prev_page": has_prev_page,
+            "has_next_page": has_next_page,
             "active_page": "logs"
         })
     except Exception as e:
         logger.error(f"Error retrieving logs: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to retrieve logs")
-
 
 @app.post("/webhook")
 async def whatsapp_webhook(request: Request):
@@ -189,7 +217,6 @@ async def whatsapp_webhook(request: Request):
     except Exception as e:
         logger.error(f"Error in webhook processing: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Webhook processing error")
-
 
 # Uncomment if running locally 
 # if __name__ == "__main__":
