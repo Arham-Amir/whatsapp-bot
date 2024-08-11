@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,7 +78,7 @@ def send_message(to_number: str, body_text: str):
     except Exception as e:
         logger.error(f"Error sending message to {to_number}: {e}")
 
-def group_messages(history: list, phone_number: str = None) -> list:
+def group_messages(history: list, phone_number: str) -> list:
     grouped = []
     temp_pair = []
     for entry in history:
@@ -95,8 +94,9 @@ def group_messages(history: list, phone_number: str = None) -> list:
     if temp_pair:
         grouped.append(temp_pair)
     return grouped
-@app.get("/", response_class=HTMLResponse)
 
+
+@app.get("/", response_class=HTMLResponse)
 async def get_edit_prompt(request: Request, message: str = None):
     """Retrieve and display the current system prompt."""
     try:
@@ -133,51 +133,64 @@ async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
         logger.error(f"Error saving system prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to save system prompt")
 
+
 @app.get("/view-logs", response_class=HTMLResponse)
 async def get_view_logs(request: Request, phone_number: Optional[str] = None, page: int = 1, per_page: int = 10):
     try:
-        grouped_messages = []
-        has_prev_page = False
-        has_next_page = False
+        all_users = []
 
         if phone_number:
+            # Fetch history for a specific phone number
             history = get_chat_history(phone_number)
             grouped_messages = group_messages(history, phone_number)
+            all_users.append({
+                'phone_number': phone_number,
+                'messages': grouped_messages,
+                'timestamp': max((entry.get('timestamp') for entry in history if entry.get('timestamp')), default=None)
+            })
         else:
+            ph_number = ""
+            # Fetch history for all phone numbers
             docs = db.collection("conversations").stream()
-            all_messages = []
             for doc in docs:
-                phone_number = doc.id
+                ph_number = doc.id
                 history = doc.to_dict().get("history", [])
-                all_messages.extend(group_messages(history, phone_number))
+                grouped_messages = group_messages(history, ph_number)
+                all_users.append({
+                    'phone_number': ph_number,
+                    'messages': grouped_messages,
+                    'timestamp': max((entry.get('timestamp') for entry in history if entry.get('timestamp')), default=None)
+                })
 
-            total_messages = len(all_messages)
-            start_index = (page - 1) * per_page
-            end_index = start_index + per_page
-            grouped_messages = all_messages[start_index:end_index]
+        all_users.sort(key=lambda x: x['timestamp'], reverse=True)
 
-            has_prev_page = page > 1
-            has_next_page = end_index < total_messages
+        total_users = len(all_users)
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        paged_users = all_users[start_index:end_index]
 
-        for group in grouped_messages:
-            for entry in group:
-                if 'timestamp' in entry:
-                    try:
-                        timestamp = datetime.fromisoformat(entry['timestamp'])
-                        entry['formatted_timestamp'] = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                    except ValueError:
-                        entry['formatted_timestamp'] = 'Invalid timestamp'
+        has_prev_page = page > 1
+        has_next_page = end_index < total_users
 
-        grouped_messages.sort(key=lambda x: x[0].get('timestamp', ''), reverse=True)
+        for user in paged_users:
+            for group in user['messages']:
+                for entry in group:
+                    if 'timestamp' in entry:
+                        try:
+                            timestamp = datetime.fromisoformat(entry['timestamp'])
+                            entry['formatted_timestamp'] = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            entry['formatted_timestamp'] = 'Invalid timestamp'
 
         return templates.TemplateResponse("view_logs.html", {
             "request": request,
-            "messages": grouped_messages,
-            "phone_number": phone_number if phone_number else None,
+            "users": paged_users,
             "page": page,
             "per_page": per_page,
+            "total_users": total_users,
             "has_prev_page": has_prev_page,
             "has_next_page": has_next_page,
+            "phone_number": phone_number if phone_number else None,
             "active_page": "logs"
         })
     except Exception as e:
@@ -217,8 +230,3 @@ async def whatsapp_webhook(request: Request):
     except Exception as e:
         logger.error(f"Error in webhook processing: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Webhook processing error")
-
-# Uncomment if running locally 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)

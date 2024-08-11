@@ -12,48 +12,64 @@
 </form>
 
 <ul class="mt-4">
-    {% if messages %}
-    {% for group in messages %}
+    {% if users %}
+    {% for user in users %}
     <li class="mb-4 p-4 border rounded-lg shadow-md">
+        <h2 class="text-xl font-bold mb-2">User: {{ user.phone_number }}</h2>
+        {% if user.messages %}
         <div class="flex flex-col gap-4">
-            {% for entry in group %}
+            {% for group in user.messages %}
             <div class="p-2 bg-gray-100 rounded-lg flex gap-3 items-start">
-                {% if entry.role.startswith('+') %}
-                <p>
-                    <a href="/view-logs?phone_number={{ entry.role|urlencode }}&page=1&per_page={{ per_page }}"
-                       class="text-blue-500 hover:text-blue-700">
-                       {{ entry.role }}
-                    </a>
-                </p>
-                {% else %}
-                <p class="font-semibold">{{ entry.role|capitalize }}:</p>
-                {% endif %}
-                <p>{{ entry.content }}</p>
+                {% for entry in group %}
+                <div class="p-2 bg-gray-200 rounded-lg mb-2">
+                    {% if entry.role == 'user' %}
+                    <p class="font-semibold">User:</p>
+                    {% else %}
+                    <p class="font-semibold">Assistant:</p>
+                    {% endif %}
+                    <p>{{ entry.content }}</p>
+                    {% if entry.formatted_timestamp %}
+                    <p class="text-gray-500 text-sm mt-2">Timestamp: {{ entry.formatted_timestamp }}</p>
+                    {% else %}
+                    <p class="text-gray-500 text-sm mt-2">Timestamp not available</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
             </div>
             {% endfor %}
-            {% if group[0].timestamp %}
-            <p class="text-gray-500 text-sm mt-2">Timestamp: {{ group[0].formatted_timestamp }}</p>
-            {% else %}
-            <p class="text-gray-500 text-sm mt-2">Timestamp not available</p>
-            {% endif %}
         </div>
+        {% else %}
+        <p>No messages found.</p>
+        {% endif %}
     </li>
     {% endfor %}
     {% else %}
-    <li>No logs found.</li>
+    <li>No users found.</li>
     {% endif %}
 </ul>
 
 <div class="mt-4">
     <nav class="flex gap-3 justify-between">
-        <a href="?page={{ page - 1 if has_prev_page else '#' }}&per_page={{ per_page }}"
-            class="text-blue-500 hover:text-blue-700 {% if not has_prev_page %}text-gray-400 cursor-not-allowed pointer-events-none{% endif %}">&laquo; Previous</a>
-        <span>Page {{ page }}</span>
-        <a href="?page={{ page + 1 if has_next_page else '#' }}&per_page={{ per_page }}" 
-            class="text-blue-500 hover:text-blue-700 {% if not has_next_page %}text-gray-400 cursor-not-allowed pointer-events-none{% endif %}">Next &raquo;</a>
+        <!-- Previous Page Link -->
+        <a href="{{ '?page=' ~ (page - 1) ~ '&per_page=' ~ per_page if has_prev_page else '#' }}"
+           class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 {% if not has_prev_page %}cursor-not-allowed opacity-50{% endif %}"
+           {% if not has_prev_page %} aria-disabled="true" {% endif %}>
+           Previous
+        </a>
+
+        <!-- Page Info -->
+        <span class="px-4 py-2 bg-gray-200 rounded-lg">
+            Page {{ page }} of {{ (total_users // per_page) + (1 if total_users % per_page > 0 else 0) }}
+        </span>
+
+        <!-- Next Page Link -->
+        <a href="{{ '?page=' ~ (page + 1) ~ '&per_page=' ~ per_page if has_next_page else '#' }}"
+           class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 {% if not has_next_page %}cursor-not-allowed opacity-50{% endif %}"
+           {% if not has_next_page %} aria-disabled="true" {% endif %}>
+           Next
+        </a>
     </nav>
 </div>
 
-{% endblock %}
 
-{% set active_page = 'logs' %}
+{% endblock %}
