@@ -169,6 +169,6 @@ async def whatsapp_webhook(request: Request):
 
 
 # Uncomment if running locally
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
