@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Your Site{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <header class="inset-x-1 bg-teal-500 h-auto p-5 mb-10">
+        <nav>
+            <ul class="flex flex-row gap-5 decoration-none text-white">
+                <li class="text-xl hover:underline hover:cursor-pointer {% if active_page == 'home' %}underline{% endif %}">
+                    <a href="/">Home</a>
+                </li>
+                <li class="text-xl hover:underline hover:cursor-pointer {% if active_page == 'logs' %}underline{% endif %}">
+                    <a href="/view-logs">Logs</a>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="flex flex-col justify-center items-center gap-8 mb-14">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const message = urlParams.get('message');
+        if (message) {
+            toastr.success(decodeURIComponent(message));
+        }
+    </script>
+</body>
+</html>

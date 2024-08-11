@@ -1,32 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Logs</title>
-</head>
-<body>
-    <h1>View Logs</h1>
-    <form action="/view-logs" method="get">
-        <label for="phone_number">Search by Phone Number:</label>
-        <input type="text" id="phone_number" name="phone_number" value="{{ phone_number }}" placeholder="Enter phone number">
-        <button type="submit">Search</button>
-    </form>
-    <ul>
-        {% for log in logs %}
-            <li>
-                <strong>Phone Number:</strong> {{ log.phone_number }}<br>
-                <strong>History:</strong><br>
-                {% for entry in log.history %}
-                    <div>
-                        <strong>Role:</strong> {{ entry.role }}<br>
-                        <strong>Content:</strong> {{ entry.content }}<br>
-                    </div>
-                {% endfor %}
-            </li>
-        {% else %}
-            <li>No logs found.</li>
+{% extends "base.html" %}
+
+{% block title %}View Logs{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl mb-5">View Logs</h1>
+<form action="/view-logs" method="get">
+    <label for="phone_number" class="block mb-2">Search by Phone Number:</label>
+    <input type="text" id="phone_number" name="phone_number" value="{{ phone_number }}" placeholder="Enter phone number"
+        class="bg-gray-200 rounded-lg p-2 mb-4">
+    <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-800">Search</button>
+</form>
+<ul class="mt-4">
+    {% for log in logs %}
+    <li class="mb-4 p-4 border rounded-lg flex flex-col gap-5 shadow-md px-10">
+        <p><strong class="block">Phone Number:</strong> {{ log.phone_number }}</p>
+        <strong class="min-w-fit mx-auto">History:</strong>
+        {% for entry in log.history %}
+        <div class="flex flex-col gap-2">
+            <p><strong>Role:</strong> {{ entry.role }}</p>
+            <p><strong>Content:</strong> {{ entry.content }}</p>
+        </div>
         {% endfor %}
-    </ul>
-</body>
-</html>
+    </li>
+    {% else %}
+    <li>No logs found.</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+{% set active_page = 'logs' %}

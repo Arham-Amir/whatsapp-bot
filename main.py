@@ -88,10 +88,18 @@ async def get_edit_prompt(request: Request):
     """Retrieve and display the current system prompt."""
     try:
         current_prompt = get_system_prompt()
-        return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": current_prompt})
+        return templates.TemplateResponse("edit_prompt.html", {
+            "request": request,
+            "current_prompt": current_prompt,
+            "active_page": "home"
+        })
     except Exception as e:
         logger.error(f"Error retrieving system prompt: {e}")
-        return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": "Default system prompt"})
+        return templates.TemplateResponse("edit_prompt.html", {
+            "request": request,
+            "current_prompt": "Default system prompt",
+            "active_page": "home"
+        })
 
 
 @app.post("/")
@@ -122,7 +130,12 @@ async def get_view_logs(request: Request, phone_number: str = None):
                 logs.append({"phone_number": doc.id, **doc.to_dict()})
 
         logger.info(f"Logs retrieved: {logs}")
-        return templates.TemplateResponse("view_logs.html", {"request": request, "logs": logs, "phone_number": phone_number})
+        return templates.TemplateResponse("view_logs.html", {
+            "request": request,
+            "logs": logs,
+            "phone_number": phone_number,
+            "active_page": "logs"
+        })
     except Exception as e:
         logger.error(f"Error retrieving logs: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to retrieve logs")
@@ -143,6 +156,7 @@ async def whatsapp_webhook(request: Request):
         messages = [{"role": "system", "content": system_prompt}] + chat_history
 
         reply_text = generate_openai_response(messages)
+        chat_history.append({"role": "assistant", "content": reply_text})
 
         save_chat_history(whatsapp_number, chat_history)
         send_message(whatsapp_number, reply_text)
@@ -155,6 +169,6 @@ async def whatsapp_webhook(request: Request):
 
 
 # Uncomment if running locally
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
