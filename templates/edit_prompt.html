@@ -1,25 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Prompt</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-</head>
-<body>
-    <h1>Edit System Prompt</h1>
-    <form action="/" method="post">
-        <textarea name="system_prompt" rows="10" cols="30">{{ current_prompt }}</textarea><br>
-        <input type="submit" value="Save">
-    </form>
+{% extends "base.html" %}
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const message = urlParams.get('message');
-        if (message) {
-            toastr.success(decodeURIComponent(message));
-        }
-    </script>
-</body>
-</html>
+{% block title %}Edit Prompt{% endblock %}
+
+{% block content %}
+    <h1 class="text-3xl text-center underline">Edit System Prompt</h1>
+    <form action="/" method="post">
+        <textarea class="bg-gray-200 rounded-lg p-5" name="system_prompt" rows="30" cols="100">{{ current_prompt }}</textarea><br>
+        <input class="mt-8 px-8 py-4 rounded-lg text-white text-lg bg-teal-600 hover:bg-teal-800 transition-all delay-200 cursor-pointer" type="submit" value="Save">
+    </form>
+{% endblock %}
+
+{% set active_page = 'home' %}
