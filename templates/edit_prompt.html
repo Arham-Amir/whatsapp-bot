@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Prompt</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+</head>
+<body>
+    <h1>Edit System Prompt</h1>
+    <form action="/" method="post">
+        <textarea name="system_prompt" rows="10" cols="30">{{ current_prompt }}</textarea><br>
+        <input type="submit" value="Save">
+    </form>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const message = urlParams.get('message');
+        if (message) {
+            toastr.success(decodeURIComponent(message));
+        }
+    </script>
+</body>
+</html>
