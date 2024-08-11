@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, Form, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 from firebase_config import db
@@ -6,6 +7,10 @@ import os
 from twilio.rest import Client
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from a .env file if present
 load_dotenv()
@@ -26,7 +31,7 @@ def get_system_prompt() -> str:
         doc = doc_ref.get()
         return doc.to_dict().get("prompt", "Default system prompt") if doc.exists else "Default system prompt"
     except Exception as e:
-        print(f"Error retrieving system prompt: {e}")
+        logger.error(f"Error retrieving system prompt: {e}")
         return "Default system prompt"
 
 
@@ -37,7 +42,7 @@ def get_chat_history(phone_number: str) -> list:
         doc = doc_ref.get()
         return doc.to_dict().get("history", []) if doc.exists else []
     except Exception as e:
-        print(f"Error retrieving chat history: {e}")
+        logger.error(f"Error retrieving chat history: {e}")
         return []
 
 
@@ -47,7 +52,7 @@ def save_chat_history(phone_number: str, chat_history: list):
         doc_ref = db.collection("conversations").document(phone_number)
         doc_ref.set({"history": chat_history})
     except Exception as e:
-        print(f"Error saving chat history: {e}")
+        logger.error(f"Error saving chat history: {e}")
 
 
 def generate_openai_response(messages: list) -> str:
@@ -61,7 +66,7 @@ def generate_openai_response(messages: list) -> str:
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"OpenAI API error: {e}")
+        logger.error(f"OpenAI API error: {e}")
         return "Sorry, I couldn't process your request."
 
 
@@ -73,9 +78,9 @@ def send_message(to_number: str, body_text: str):
             body=body_text,
             to=f"whatsapp:{to_number}"
         )
-        print(f"Message sent to {to_number}: {message.body}")
+        logger.info(f"Message sent to {to_number}: {message.body}")
     except Exception as e:
-        print(f"Error sending message to {to_number}: {e}")
+        logger.error(f"Error sending message to {to_number}: {e}")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -83,11 +88,10 @@ async def get_edit_prompt(request: Request):
     """Retrieve and display the current system prompt."""
     try:
         current_prompt = get_system_prompt()
+        return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": current_prompt})
     except Exception as e:
-        print(f"Error retrieving system prompt: {e}")
-        current_prompt = "Default system prompt"
-
-    return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": current_prompt})
+        logger.error(f"Error retrieving system prompt: {e}")
+        return templates.TemplateResponse("edit_prompt.html", {"request": request, "current_prompt": "Default system prompt"})
 
 
 @app.post("/")
@@ -98,7 +102,7 @@ async def post_edit_prompt(system_prompt: str = Form(...)):
         doc_ref.set({"prompt": system_prompt})
         return RedirectResponse(url="/?message=System%20prompt%20updated%20successfully!", status_code=302)
     except Exception as e:
-        print(f"Error saving system prompt: {e}")
+        logger.error(f"Error saving system prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to save system prompt")
 
 
@@ -117,10 +121,10 @@ async def get_view_logs(request: Request, phone_number: str = None):
             for doc in docs:
                 logs.append({"phone_number": doc.id, **doc.to_dict()})
 
-        print(f"Logs retrieved: {logs}")
+        logger.info(f"Logs retrieved: {logs}")
         return templates.TemplateResponse("view_logs.html", {"request": request, "logs": logs, "phone_number": phone_number})
     except Exception as e:
-        print(f"Error retrieving logs: {e}")
+        logger.error(f"Error retrieving logs: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to retrieve logs")
 
 
@@ -146,7 +150,7 @@ async def whatsapp_webhook(request: Request):
         return ""
 
     except Exception as e:
-        print(f"Error in webhook processing: {e}")
+        logger.error(f"Error in webhook processing: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Webhook processing error")
 
 
