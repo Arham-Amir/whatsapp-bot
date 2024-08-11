@@ -10,9 +10,9 @@
         class="bg-gray-200 rounded-lg p-2 mb-4">
     <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-800">Search</button>
 </form>
-<ul class="mt-4">
+<ul class="masonry mt-4">
     {% for log in logs %}
-    <li class="mb-4 p-4 border rounded-lg flex flex-col gap-5 shadow-md px-10">
+    <li class="masonry-item p-4 border rounded-lg flex flex-col gap-5 shadow-md px-10">
         <p><strong class="block">Phone Number:</strong> {{ log.phone_number }}</p>
         <strong class="min-w-fit mx-auto">History:</strong>
         {% for entry in log.history %}

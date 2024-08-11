@@ -82,33 +82,40 @@ def send_message(to_number: str, body_text: str):
     except Exception as e:
         logger.error(f"Error sending message to {to_number}: {e}")
 
-
 @app.get("/", response_class=HTMLResponse)
-async def get_edit_prompt(request: Request):
+async def get_edit_prompt(request: Request, message: str = None):
     """Retrieve and display the current system prompt."""
     try:
         current_prompt = get_system_prompt()
         return templates.TemplateResponse("edit_prompt.html", {
             "request": request,
             "current_prompt": current_prompt,
-            "active_page": "home"
+            "active_page": "home",
+            "message": message
         })
     except Exception as e:
         logger.error(f"Error retrieving system prompt: {e}")
         return templates.TemplateResponse("edit_prompt.html", {
             "request": request,
             "current_prompt": "Default system prompt",
-            "active_page": "home"
+            "active_page": "home",
+            "message": message
         })
 
 
 @app.post("/")
-async def post_edit_prompt(system_prompt: str = Form(...)):
+async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
     """Update and save the system prompt."""
     try:
         doc_ref = db.collection("settings").document("system_prompt")
         doc_ref.set({"prompt": system_prompt})
-        return RedirectResponse(url="/?message=System%20prompt%20updated%20successfully!", status_code=302)
+        message = "System prompt updated successfully!"
+        return templates.TemplateResponse("edit_prompt.html", {
+            "request": request,
+            "current_prompt": system_prompt,
+            "active_page": "home",
+            "message": message
+        })
     except Exception as e:
         logger.error(f"Error saving system prompt: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error: Failed to save system prompt")
@@ -129,7 +136,7 @@ async def get_view_logs(request: Request, phone_number: str = None):
             for doc in docs:
                 logs.append({"phone_number": doc.id, **doc.to_dict()})
 
-        logger.info(f"Logs retrieved: {logs}")
+        logger.info(f"Logs retrieved.")
         return templates.TemplateResponse("view_logs.html", {
             "request": request,
             "logs": logs,
