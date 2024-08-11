@@ -22,7 +22,7 @@
             <div class="p-2 bg-gray-100 rounded-lg flex gap-3 items-start">
                 {% for entry in group %}
                 <div class="p-2 bg-gray-200 rounded-lg mb-2">
-                    {% if entry.role == 'user' %}
+                    {% if entry.role.startswith('+') %}
                     <p class="font-semibold">User:</p>
                     {% else %}
                     <p class="font-semibold">Assistant:</p>
