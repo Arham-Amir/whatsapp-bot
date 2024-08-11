@@ -7,6 +7,7 @@ import os
 from twilio.rest import Client
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
+from datetime import datetime
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -123,7 +124,7 @@ async def post_edit_prompt(request: Request, system_prompt: str = Form(...)):
 
 @app.get("/view-logs", response_class=HTMLResponse)
 async def get_view_logs(request: Request, phone_number: str = None):
-    """Retrieve and display logs for a specific phone number or all logs."""
+    """Retrieve and display logs for a specific phone number or all logs, ordered by date."""
     try:
         logs = []
         if phone_number:
@@ -136,7 +137,14 @@ async def get_view_logs(request: Request, phone_number: str = None):
             for doc in docs:
                 logs.append({"phone_number": doc.id, **doc.to_dict()})
 
-        logger.info(f"Logs retrieved.")
+        # Sort each log's history by timestamp in descending order
+        for log in logs:
+            log['history'] = sorted(log['history'], key=lambda x: x['timestamp'], reverse=True)
+
+        # Sort logs themselves by the most recent entry in the history
+        logs.sort(key=lambda x: x['history'][0]['timestamp'] if x['history'] else 0, reverse=True)
+
+        logger.info("Logs retrieved and sorted by date.")
         return templates.TemplateResponse("view_logs.html", {
             "request": request,
             "logs": logs,
@@ -157,13 +165,21 @@ async def whatsapp_webhook(request: Request):
         whatsapp_number = form_data.get('From').split("whatsapp:")[-1]
 
         chat_history = get_chat_history(whatsapp_number)
-        chat_history.append({"role": "user", "content": message_body})
+        chat_history.append({
+            "role": "user",
+            "content": message_body,
+            "timestamp": datetime.now().isoformat()  # Add timestamp here
+        })
 
         system_prompt = get_system_prompt()
         messages = [{"role": "system", "content": system_prompt}] + chat_history
 
         reply_text = generate_openai_response(messages)
-        chat_history.append({"role": "assistant", "content": reply_text})
+        chat_history.append({
+            "role": "assistant",
+            "content": reply_text,
+            "timestamp": datetime.now().isoformat()  # Add timestamp here
+        })
 
         save_chat_history(whatsapp_number, chat_history)
         send_message(whatsapp_number, reply_text)
