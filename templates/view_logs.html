@@ -12,58 +12,65 @@
         class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-800 transition-all">Search</button>
 </form>
 
-<table class="min-w-full divide-y divide-gray-200 mt-4">
-    <thead class="bg-gray-200 text-black">
-        <tr>
-            <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider rounded-tl-lg">
-                User
-            </th>
-            <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider">
-                Latest Message
-            </th>
-            <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider rounded-tr-lg">
-                Messages
-            </th>
-        </tr>
-    </thead>
-    <tbody class="bg-gray-100/50 divide-y divide-gray-200">
-        {% if users %}
-        {% for user in users %}
-        <tr>
-            <td class="px-6 py-4 whitespace-nowrap text-left">
-                <button class="text-sm md:text-lg font-bold hover:underline text-gray-500"
-                    onclick="openModal('{{ user.phone_number }}')">
-                    {{ user.phone_number }}
-                </button>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {% if user.messages %}
-                {% set latest_message = user.messages|last|first %}
-                {{ latest_message.formatted_timestamp or 'No timestamp available' }}
-                {% else %}
-                No messages
-                {% endif %}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ user.messages|length }}
-            </td>
-        </tr>
-        {% endfor %}
-        {% else %}
-        <tr>
-            <td colspan="3" class="px-6 py-4 text-center text-gray-500">No users found.</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
+<div class="overflow-x-auto w-full">
+    <table class="min-w-full divide-y divide-gray-200 mt-4">
+        <thead class="bg-gray-200 text-black">
+            <tr>
+                <th scope="col"
+                    class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider rounded-tl-lg">
+                    User
+                </th>
+                <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider">
+                    Latest Message
+                </th>
+                <th scope="col"
+                    class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider rounded-tr-lg">
+                    Messages
+                </th>
+            </tr>
+        </thead>
+        <tbody class="bg-gray-100/50 divide-y divide-gray-200">
+            {% if users %}
+            {% for user in users %}
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-left">
+                    <button class="text-sm md:text-lg font-bold hover:underline text-gray-500"
+                        onclick="openModal('{{ user.phone_number }}')">
+                        {{ user.phone_number }}
+                    </button>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if user.messages %}
+                    {% set latest_message = user.messages|last|first %}
+                    {{ latest_message.formatted_timestamp or 'No timestamp available' }}
+                    {% else %}
+                    No messages
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ user.messages|length }}
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="3" class="px-6 py-4 text-center text-gray-500">No users found.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
 
 <!-- Modals -->
 {% for user in users %}
 <dialog id="modal_{{ user.phone_number }}" class="modal" onclick="closeModal(event)">
     <div class="modal-box pt-0 px-2 relative w-11/12 max-w-4xl max-h-[90vh] overflow-y-hidden rounded-lg">
-        <div class="py-4 sticky top-0 left-0 w-full flex justify-between items-center bg-white border-b border-gray-200">
+        <div
+            class="py-4 sticky top-0 left-0 w-full flex justify-between items-center bg-white border-b border-gray-200">
+            <p></p>
             <h3 class="font-bold text-lg">Chat History for {{ user.phone_number }}</h3>
-            <button class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-all" onclick="closeModal(event, 'button')">
+            <button class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-all"
+                onclick="closeModal(event, 'button')">
                 <i data-lucide="x" class="w-6 h-6 text-gray-600"></i>
             </button>
         </div>
@@ -105,8 +112,8 @@
         </a>
 
         <!-- Page Info -->
-        <span class="px-4 py-2 bg-gray-200 text-center rounded-lg">
-            Page {{ page }} of {{ (total_users // per_page) + (1 if total_users % per_page > 0 else 0) }}
+        <span class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg">
+            Page {{ page }} of {{ total_pages }}
         </span>
 
         <!-- Next Page Link -->
@@ -129,5 +136,4 @@
         }
     }
 </script>
-
 {% endblock %}
