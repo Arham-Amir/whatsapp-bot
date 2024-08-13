@@ -3,10 +3,17 @@
 {% block title %}Edit Prompt{% endblock %}
 
 {% block content %}
-    <h1 class="text-3xl text-center underline">Edit System Prompt</h1>
-    <form action="/" method="post">
-        <textarea class="bg-gray-200 rounded-lg p-5" name="system_prompt" rows="30" cols="100">{{ current_prompt }}</textarea><br>
-        <input class="mt-8 px-8 py-4 rounded-lg text-white text-lg bg-teal-600 hover:bg-teal-800 transition-all delay-200 cursor-pointer" type="submit" value="Save">
+    <h1 class="text-2xl md:text-3xl text-center underline mb-6 dark:text-white">Edit System Prompt</h1>
+    <form action="/" method="post" class="flex flex-col items-center">
+        <textarea 
+            class="bg-gray-200 dark:bg-gray-800 rounded-lg p-5 text-black dark:text-white w-full max-w-4xl h-96 md:h-[50vh] resize-none" 
+            name="system_prompt" 
+            rows="30" 
+            cols="100">{{ current_prompt }}</textarea><br>
+        <input 
+            class="mt-8 px-8 py-4 rounded-lg text-white text-lg bg-teal-600 hover:bg-teal-800 transition-all cursor-pointer" 
+            type="submit" 
+            value="Save">
     </form>
 {% endblock %}
 

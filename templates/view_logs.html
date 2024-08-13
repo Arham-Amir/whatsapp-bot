@@ -3,39 +3,40 @@
 {% block title %}View Logs{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl mb-5">View Logs</h1>
-<form action="/view-logs" method="get">
-    <label for="phone_number" class="block mb-2">Search by Phone Number:</label>
+<h1 class="text-2xl md:text-3xl mb-5 text-center md:text-left">View Logs</h1>
+<form action="/view-logs" method="get" class="flex flex-col gap-4">
+    <label for="phone_number" class="block text-sm md:text-base">Search by Phone Number:</label>
     <input type="text" id="phone_number" name="phone_number" value="{{ phone_number if phone_number else '' }}"
-        placeholder="Enter phone number" class="bg-gray-200 rounded-lg p-2 mb-4">
-    <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-800">Search</button>
+        placeholder="Enter phone number" class="bg-gray-200 dark:bg-gray-800 rounded-lg p-2 mb-4">
+    <button type="submit"
+        class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-800 transition-all">Search</button>
 </form>
 
-<table class="min-w-full divide-y divide-gray-200 mt-4">
-    <thead class="bg-teal-500 text-white">
+<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 mt-4">
+    <thead class="bg-gray-200 dark:bg-gray-800 text-black dark:text-white">
         <tr>
-            <th scope="col" class="px-6 py-5 text-left text-base font-medium uppercase tracking-wider rounded-tl-lg">
+            <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider rounded-tl-lg">
                 User
             </th>
-            <th scope="col" class="px-6 py-5 text-left text-base font-medium uppercase tracking-wider">
+            <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider">
                 Latest Message
             </th>
-            <th scope="col" class="px-6 py-5 text-left text-base font-medium uppercase tracking-wider rounded-tr-lg">
+            <th scope="col" class="px-6 py-5 text-left text-sm md:text-base font-medium uppercase tracking-wider rounded-tr-lg">
                 Messages
             </th>
         </tr>
     </thead>
-    <tbody class="bg-teal-100/50 divide-y divide-gray-200">
+    <tbody class="bg-gray-100/50 dark:bg-gray-700/50 divide-y divide-gray-200 dark:divide-gray-700">
         {% if users %}
         {% for user in users %}
         <tr>
             <td class="px-6 py-4 whitespace-nowrap text-left">
-                <button class="text-lg font-bold hover:underline text-gray-500"
+                <button class="text-sm md:text-lg font-bold hover:underline text-gray-500 dark:text-gray-300"
                     onclick="openModal('{{ user.phone_number }}')">
                     {{ user.phone_number }}
                 </button>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                 {% if user.messages %}
                 {% set latest_message = user.messages|last|first %}
                 {{ latest_message.formatted_timestamp or 'No timestamp available' }}
@@ -43,14 +44,14 @@
                 No messages
                 {% endif %}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                 {{ user.messages|length }}
             </td>
         </tr>
         {% endfor %}
         {% else %}
         <tr>
-            <td colspan="3" class="px-6 py-4 text-center text-gray-500">No users found.</td>
+            <td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-300">No users found.</td>
         </tr>
         {% endif %}
     </tbody>
@@ -59,29 +60,28 @@
 <!-- Modals -->
 {% for user in users %}
 <dialog id="modal_{{ user.phone_number }}" class="modal" onclick="closeModal(event)">
-    <div class="modal-box pt-0 px-2 relative w-11/12 max-w-4xl max-h-[90vh] overflow-y-hidden rounded-lg">
-        <div class="py-4 sticky top-0 left-0 w-full flex justify-between items-center bg-white border-b border-gray-200">
-            <p></p>
+    <div class="modal-box pt-0 px-2 relative w-11/12 max-w-4xl max-h-[90vh] overflow-y-hidden rounded-lg dark:bg-gray-900 dark:text-white">
+        <div class="py-4 sticky top-0 left-0 w-full flex justify-between items-center bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
             <h3 class="font-bold text-lg">Chat History for {{ user.phone_number }}</h3>
-            <button class="p-2 bg-gray-200 rounded-full hover:bg-gray-300" onclick="closeModal(event)">
-                <i data-lucide="x" class="w-6 h-6 text-gray-600"></i>
+            <button class="p-2 bg-gray-200 dark:bg-gray-800 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 transition-all" onclick="closeModal(event, 'button')">
+                <i data-lucide="x" class="w-6 h-6 text-gray-600 dark:text-gray-300"></i>
             </button>
         </div>
-        <div class="p-4 bg-gray-100/50 h-[80vh] overflow-y-auto mb-8">
+        <div class="p-4 bg-gray-100/50 dark:bg-gray-700/50 h-[80vh] overflow-y-auto mb-8">
             {% if user.messages %}
             {% for group in user.messages %}
             <div class="flex flex-col gap-4 mb-4">
                 {% for entry in group %}
-                <div class="p-2 rounded-lg {{ 'bg-gray-200' if entry.role.startswith('+') else 'bg-gray-100' }} w-full">
+                <div class="p-2 rounded-lg {{ 'bg-gray-200 dark:bg-gray-800' if entry.role.startswith('+') else 'bg-gray-100 dark:bg-gray-700' }} w-full">
                     <div class="font-semibold flex gap-2 items-start">
                         <i data-lucide="{{ 'users' if entry.role.startswith('+') else 'bot-message-square' }}"
-                            class="{{ 'text-blue-600' if entry.role.startswith('+') else 'text-black' }} text-sm"></i>
+                            class="{{ 'text-blue-600 dark:text-blue-300' if entry.role.startswith('+') else 'text-black dark:text-white' }} text-sm"></i>
                         <p>{{ entry.content }}</p>
                     </div>
                     {% if entry.formatted_timestamp %}
-                    <p class="text-gray-500 text-sm mt-2">Timestamp: {{ entry.formatted_timestamp }}</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-2">Timestamp: {{ entry.formatted_timestamp }}</p>
                     {% else %}
-                    <p class="text-gray-500 text-sm mt-2">Timestamp not available</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-2">Timestamp not available</p>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -96,24 +96,24 @@
 {% endfor %}
 
 <div class="mt-4">
-    <nav class="flex gap-3 justify-between">
+    <nav class="flex flex-row gap-3 justify-between">
         <!-- Previous Page Link -->
         <a href="{{ '?page=' ~ (page - 1) ~ '&per_page=' ~ per_page if has_prev_page else '#' }}"
-            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 {% if not has_prev_page %}cursor-not-allowed opacity-50{% endif %}"
+            class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-700 transition-all {% if not has_prev_page %}cursor-not-allowed opacity-50{% endif %}"
             {% if not has_prev_page %} aria-disabled="true" {% endif %}>
-            Previous
+            <i data-lucide="chevron-first"></i>
         </a>
 
         <!-- Page Info -->
-        <span class="px-4 py-2 bg-gray-200 rounded-lg">
+        <span class="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-center rounded-lg">
             Page {{ page }} of {{ (total_users // per_page) + (1 if total_users % per_page > 0 else 0) }}
         </span>
 
         <!-- Next Page Link -->
         <a href="{{ '?page=' ~ (page + 1) ~ '&per_page=' ~ per_page if has_next_page else '#' }}"
-            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 {% if not has_next_page %}cursor-not-allowed opacity-50{% endif %}"
+            class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-700 transition-all {% if not has_next_page %}cursor-not-allowed opacity-50{% endif %}"
             {% if not has_next_page %} aria-disabled="true" {% endif %}>
-            Next
+            <i data-lucide="chevron-last"></i>
         </a>
     </nav>
 </div>
@@ -123,8 +123,8 @@
         document.getElementById('modal_' + phoneNumber).showModal();
     }
 
-    function closeModal(event) {
-        if (event.target.tagName === 'DIALOG' || event.target.tagName === 'BUTTON') {
+    function closeModal(event, source) {
+        if (source === 'button' || event.target.tagName === 'DIALOG') {
             event.target.closest('dialog').close();
         }
     }
