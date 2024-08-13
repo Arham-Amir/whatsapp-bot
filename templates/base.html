@@ -22,6 +22,10 @@
         }
     </style>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    
 </head>
 
 <body>
@@ -36,8 +40,7 @@
                     class="text-2xl underline-offset-4 hover:underline hover:cursor-pointer {% if active_page == 'logs' %}underline{% endif %}">
                     <a href="/view-logs">Logs</a>
                 </li>
-                <li
-                    class="text-2xl underline-offset-4 hover:underline hover:cursor-pointer">
+                <li class="text-2xl underline-offset-4 hover:underline hover:cursor-pointer">
                     <a href="/signout">Sign Out</a>
                 </li>
             </ul>
@@ -53,6 +56,11 @@
     <main class="flex flex-col justify-center items-center gap-8 mb-14 px-4 w-full md:max-w-[80%] mx-auto">
         {% block content %}{% endblock %}
     </main>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 
 </html>
